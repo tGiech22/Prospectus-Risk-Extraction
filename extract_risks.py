@@ -6,19 +6,27 @@ from collections import Counter
 
 import pdfplumber
 
+# Section boundary detection.
 START_RE = re.compile(r"^\s*RISK\s+FACTORS\s*$", re.I)
 END_RE = re.compile(
     r"^\s*(USE\s+OF\s+PROCEEDS|MANAGEMENT|BUSINESS|DESCRIPTION\s+OF\s+SECURITIES)\s*$",
     re.I,
 )
+
+# Basic word tokenizer for risk body word counts.
 WORD_RE = re.compile(r"\b[0-9A-Za-z']+\b")
 
 
 def is_page_number(text):
+    """Return True for lines that are just a page number."""
     return text.strip().isdigit()
 
 
 def group_lines(words, y_tol=1.5):
+    """
+    Group PDF words into lines based on their vertical position and enrich
+    each line with text, font usage, and average font size.
+    """
     lines = []
     for w in sorted(words, key=lambda x: (x["top"], x["x0"])):
         if not lines or abs(lines[-1]["top"] - w["top"]) > y_tol:
@@ -35,6 +43,7 @@ def group_lines(words, y_tol=1.5):
 
 
 def line_style(line):
+    """Classify line styling as bold or bold-italic based on font names."""
     fonts = line["fonts"]
     total = sum(fonts.values()) or 1
     bold_italic = sum(v for k, v in fonts.items() if "BoldItalic" in k) / total
@@ -46,6 +55,10 @@ def line_style(line):
 
 
 def extract_risk_section_lines(pdf_path):
+    """
+    Extract all lines in the Risk Factors section by scanning pages
+    between the 'RISK FACTORS' heading and the next major section.
+    """
     in_section = False
     section_lines = []
     with pdfplumber.open(pdf_path) as pdf:
@@ -72,6 +85,10 @@ def extract_risk_section_lines(pdf_path):
 
 
 def looks_like_title(text, line_size, body_size):
+    """
+    Heuristic title detection for PDFs that don't use bold-italic headings.
+    Uses capitalization, length, and relative font size.
+    """
     if not text or is_page_number(text):
         return False
     if text.lower().startswith("table of contents"):
@@ -95,6 +112,13 @@ def looks_like_title(text, line_size, body_size):
 
 
 def split_risks(section_lines):
+    """
+    Split the Risk Factors section into individual risks.
+    Priority order:
+    1) bold-italic headings (most reliable for this sample),
+    2) bold headings,
+    3) heuristic title lines (fallback for other prospectuses).
+    """
     body_sizes = [l.get("size", 0) for l in section_lines if l.get("size", 0) > 0]
     body_size = sorted(body_sizes)[len(body_sizes) // 2] if body_sizes else 0
     has_bold_italic = any(line_style(l)["bold_italic"] for l in section_lines)
@@ -137,10 +161,12 @@ def split_risks(section_lines):
 
 
 def count_words(text):
+    """Count word-like tokens in a string."""
     return len(WORD_RE.findall(text))
 
 
 def analyze(pdf_path):
+    """End-to-end extraction and counting for a single PDF."""
     section_lines = extract_risk_section_lines(pdf_path)
     risks = split_risks(section_lines)
     result = []
@@ -159,6 +185,7 @@ def analyze(pdf_path):
 
 
 def main():
+    """CLI entrypoint."""
     parser = argparse.ArgumentParser()
     parser.add_argument("pdf_path")
     parser.add_argument("--json", action="store_true")
