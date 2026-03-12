@@ -4,7 +4,8 @@ import re
 
 import pdfplumber
 
-WORD_RE = re.compile(r"\b[0-9A-Za-z']+\b")
+# Include ASCII apostrophe and common Unicode apostrophes.
+WORD_RE = re.compile(r"\b[0-9A-Za-z'’‛`]+\b")
 
 
 def count_words_in_pdf(pdf_path):
