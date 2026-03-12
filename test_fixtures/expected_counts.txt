@@ -1,0 +1,5 @@
+empty.pdf	0
+simple1.pdf	14
+simple2.pdf	10
+simple3.pdf	23
+simple4.pdf	22
