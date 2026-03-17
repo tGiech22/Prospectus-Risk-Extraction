@@ -9,6 +9,7 @@ Three-pass approach:
 Requirements: pip install PyMuPDF openpyxl
 """
 
+import argparse
 import os, re, json, csv, fitz
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
@@ -23,7 +24,7 @@ try:
 except ImportError:
     HAS_OPENPYXL = False
 
-# put in the path to your PDFs here
+# Optional defaults; these can be overridden via command-line arguments.
 PDF_FOLDER = "#insert pdf file path"
 OUTPUT_CSV = "./results.csv"
 DEBUG = True  # Set to True for diagnostics
@@ -778,11 +779,39 @@ def save_excel(analyses, op):
     ws2.freeze_panes = "A2"
     wb.save(ep); print(f"Excel:    {ep}")
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Analyze prospectus PDFs and extract risk factor statistics.",
+    )
+    parser.add_argument(
+        "pdf_folder",
+        nargs="?",
+        default=PDF_FOLDER,
+        help="Root folder containing PDFs to analyze recursively",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-csv",
+        default=OUTPUT_CSV,
+        help="Base CSV output path",
+    )
+    return parser.parse_args()
+
+
 def main():
-    pf = Path(PDF_FOLDER)
-    if not pf.exists(): print(f"ERROR: '{PDF_FOLDER}' not found."); return
-    pdfs = sorted(pf.glob("*.pdf"))
-    if not pdfs: print(f"No PDFs in '{PDF_FOLDER}'."); return
+    args = parse_args()
+    pf = Path(args.pdf_folder).expanduser()
+    if args.pdf_folder == PDF_FOLDER and PDF_FOLDER == "#insert pdf file path":
+        print("ERROR: provide a PDF folder path as a command-line argument.")
+        return
+    if not pf.exists():
+        print(f"ERROR: '{pf}' not found.")
+        return
+
+    pdfs = sorted(p for p in pf.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
+    if not pdfs:
+        print(f"No PDFs in '{pf}'.")
+        return
     print(f"Found {len(pdfs)} PDF(s)")
     print(f"Debug: {'ON' if DEBUG else 'OFF'}"); print("="*60)
     analyses = []
@@ -792,7 +821,7 @@ def main():
             print(f"  ERROR {p.name}: {e}")
             import traceback; traceback.print_exc()
     if analyses:
-        save_results(analyses, OUTPUT_CSV)
+        save_results(analyses, args.output_csv)
         print("\n"+"="*90); print("SUMMARY"); print("="*90)
         hdr = f"{'File':<40} {'Words':>8} {'RFs':>5} {'Avg':>6} {'Med':>6} {'Method':<20} {'Warn':>4}"
         print(hdr); print("-"*90)
