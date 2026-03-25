@@ -719,6 +719,15 @@ def save_results(analyses, op):
                 w.writerow([a.filename,i,rf.title,rf.word_count])
     print(f"Detailed: {dp}")
 
+    cp = op.replace(".csv","_risk_word_counts.csv")
+    max_risk_factors = max((a.num_risk_factors for a in analyses), default=0)
+    with open(cp,'w',newline='',encoding='utf-8') as f:
+        w = csv.writer(f)
+        w.writerow(["Filename", *[f"Risk {i} Word Count" for i in range(1, max_risk_factors + 1)]])
+        for a in analyses:
+            w.writerow([a.filename, *[rf.word_count for rf in a.risk_factors]])
+    print(f"Counts:   {cp}")
+
     jp = op.replace(".csv","_full.json")
     with open(jp,'w',encoding='utf-8') as f:
         data = []
