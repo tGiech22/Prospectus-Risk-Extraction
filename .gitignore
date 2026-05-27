@@ -1,0 +1,14 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+
+# Generated analysis outputs
+artifacts/reports/
+artifacts/spreadsheets/
+artifacts/json/
+
+# Local outputs from ad-hoc runs
+*.csv
+*.xlsx
+*.json
