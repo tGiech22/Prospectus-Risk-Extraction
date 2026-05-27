@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prospectus-risk-extraction"
+version = "0.1.0"
+description = "Layout-aware NLP pipeline for extracting risk factors from prospectus PDFs."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PyMuPDF",
+  "openpyxl",
+  "pdfplumber",
+]
+
+[project.scripts]
+prospectus-analyze = "prospectus_risk_extraction.analyzer:main"
+prospectus-extract-risks = "prospectus_risk_extraction.extract_risks:main"
+prospectus-count-words = "prospectus_risk_extraction.count_pdf_words:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
