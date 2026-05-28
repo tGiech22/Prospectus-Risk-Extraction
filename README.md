@@ -9,6 +9,7 @@ layout-aware heuristics and text processing.
 - `data/sample_pdfs/`: sample PDF inputs
 - `test_fixtures/`: small fixture PDFs for regression tests
 - `artifacts/`: generated reports and outputs from runs
+- `docs/`: labeling guidelines and baseline evaluation guide
 
 ## Setup
 
