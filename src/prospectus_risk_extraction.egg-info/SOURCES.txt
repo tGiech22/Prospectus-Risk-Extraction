@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/prospectus_risk_extraction/__init__.py
+src/prospectus_risk_extraction/analyzer.py
+src/prospectus_risk_extraction/count_pdf_words.py
+src/prospectus_risk_extraction/extract_risks.py
+src/prospectus_risk_extraction.egg-info/PKG-INFO
+src/prospectus_risk_extraction.egg-info/SOURCES.txt
+src/prospectus_risk_extraction.egg-info/dependency_links.txt
+src/prospectus_risk_extraction.egg-info/entry_points.txt
+src/prospectus_risk_extraction.egg-info/requires.txt
+src/prospectus_risk_extraction.egg-info/top_level.txt
+tests/test_package_import.py
