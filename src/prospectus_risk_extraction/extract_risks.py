@@ -82,11 +82,11 @@ def extract_risk_section_lines(pdf_path):
                     toc_like += 1
 
             score = 0
-            if re.search(r"TABLE\\s+OF\\s+CONTENTS", text, re.I):
+            if re.search(r"TABLE\s+OF\s+CONTENTS", text, re.I):
                 score -= 2
             if toc_like >= 5:
                 score -= 2
-            if re.search(r"Risks\\s+Related\\s+to", text, re.I):
+            if re.search(r"Risks\s+Related\s+to", text, re.I):
                 score += 1
             if re.search(r"(Investing in our common stock|An investment in our)", text, re.I):
                 score += 2
@@ -110,7 +110,7 @@ def extract_risk_section_lines(pdf_path):
                     if START_RE.match(txt):
                         started = True
                     continue
-                if re.sub(r"\\s+", " ", txt.strip()).lower() == "table of contents":
+                if re.sub(r"\s+", " ", txt.strip()).lower() == "table of contents":
                     continue
                 if START_RE.match(txt):
                     continue
