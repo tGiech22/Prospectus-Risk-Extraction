@@ -10,7 +10,7 @@ Requirements: pip install PyMuPDF openpyxl
 """
 
 import argparse
-import os, re, json, csv, fitz
+import re, json, csv, fitz
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Optional
@@ -27,7 +27,7 @@ except ImportError:
 # Optional defaults; these can be overridden via command-line arguments.
 PDF_FOLDER = "#insert pdf file path"
 OUTPUT_CSV = "./results.csv"
-DEBUG = True  # Set to True for diagnostics
+DEBUG = False  # Diagnostics off by default; enable with the --debug CLI flag.
 
 @dataclass
 class Span:
@@ -804,11 +804,18 @@ def parse_args():
         default=OUTPUT_CSV,
         help="Base CSV output path",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print detailed diagnostics while analyzing each PDF",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    global DEBUG
+    DEBUG = args.debug
     pf = Path(args.pdf_folder).expanduser()
     if args.pdf_folder == PDF_FOLDER and PDF_FOLDER == "#insert pdf file path":
         print("ERROR: provide a PDF folder path as a command-line argument.")
