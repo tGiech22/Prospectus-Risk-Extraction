@@ -14,6 +14,9 @@ dependencies = [
   "pdfplumber",
 ]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [project.scripts]
 prospectus-analyze = "prospectus_risk_extraction.analyzer:main"
 prospectus-extract-risks = "prospectus_risk_extraction.extract_risks:main"
