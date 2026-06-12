@@ -12,6 +12,8 @@ dist/
 artifacts/reports/
 artifacts/spreadsheets/
 artifacts/json/
+artifacts/ml/
+artifacts/models/
 
 # Local outputs from ad-hoc runs
 *.csv

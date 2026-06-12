@@ -16,11 +16,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+ml = ["scikit-learn", "pandas", "numpy", "joblib"]
 
 [project.scripts]
 prospectus-analyze = "prospectus_risk_extraction.analyzer:main"
 prospectus-extract-risks = "prospectus_risk_extraction.extract_risks:main"
 prospectus-count-words = "prospectus_risk_extraction.count_pdf_words:main"
+prospectus-ml-dataset = "prospectus_risk_extraction.ml.dataset:main"
+prospectus-ml-train = "prospectus_risk_extraction.ml.train:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
