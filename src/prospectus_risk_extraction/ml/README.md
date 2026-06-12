@@ -1,0 +1,64 @@
+# ML: line classification
+
+This subpackage reframes risk-factor segmentation as a **supervised line-classification**
+problem and gives you the full scikit-learn workflow on data you already have.
+
+## The task
+
+Every line inside a Risk Factors section is one example, labeled:
+
+| label | meaning |
+|-------|---------|
+| `heading` | starts a new risk factor (the title line) |
+| `body` | explanatory text under a heading |
+| `subheading` | a category like *Risks Related to Our Business* |
+| `skip` | page numbers, table-of-contents lines, noise |
+
+Grouping consecutive `heading` runs then gives the risk **count** the product cares about.
+
+## Where the labels come from (read this)
+
+Labels are currently **distilled from the heuristic** (`analyzer.py` Pass-1), in
+[labeling.py](labeling.py) `weak_label()`. So a model trained here learns to *reproduce
+the rule system* — the heuristic is its ceiling. That is intentional: it lets you practice
+the entire pipeline (features → train → cross-validate → confusion matrix → risk count)
+before doing any hand-labeling. When you hand-label real gold lines, replace `weak_label`
+(or supply your own `label` column) and nothing else changes.
+
+## Data reality
+
+The `test_fixtures/*.pdf` are one-sentence smoke tests for the word counter (e.g.
+`"Hello world."`) — **not** risk-factor data. The only real document is the Aegerion
+prospectus in `data/sample_pdfs/`. With one document you cannot estimate generalization,
+so `train.py` prints a loud warning and uses a (optimistic) line-level split. Drop more
+real prospectus PDFs into the folder and evaluation **automatically upgrades** to
+document-grouped cross-validation — no code change.
+
+## Usage
+
+```bash
+pip install -e ".[ml]"
+
+# 1. Dump the dataset to inspect by hand (recommended first step)
+prospectus-ml-dataset data/sample_pdfs -o artifacts/ml/line_dataset.csv
+
+# 2. Train + evaluate + save the model
+prospectus-ml-train data/sample_pdfs
+```
+
+## Files
+
+| file | role |
+|------|------|
+| [labeling.py](labeling.py) | per-line features + weak label (reuses analyzer parsing) |
+| [dataset.py](dataset.py) | build a `pandas` DataFrame / CSV across PDFs |
+| [train.py](train.py) | sklearn pipeline (layout features + TF-IDF → logistic regression), grouped CV, report, risk-count check |
+
+## Next steps (the learning path)
+
+1. **Hand-label** a few real prospectuses → swap weak labels for gold; re-run.
+2. **More PDFs** → grouped CV gives a real generalization number to beat the heuristic.
+3. **Better model** → try gradient boosting on numeric features, then a transformer
+   (DistilBERT on line text, or LayoutLM to fuse text + geometry) using the same dataset.
+4. **Close the loop** → feed predicted `heading` lines back into segmentation and score
+   with the metrics in `docs/evaluation_and_baseline_reporting.md`.
