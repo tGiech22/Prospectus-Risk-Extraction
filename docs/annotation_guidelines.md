@@ -36,6 +36,25 @@ An ordered list of risks inside that section. Each risk has:
 
 Use these rules so labels stay consistent across annotators and PDF layouts.
 
+### Granularity rule: one styled heading = one risk factor
+
+This is the primary rule. Decide what counts as a separate risk **structurally** (does the PDF render it as its own heading?), not **semantically** (do these feel like the same topic?). Topic-relatedness is not the unit the filing uses — its own typography is. This is also the signal the model keys on, so gold and model agree on what a "risk" is.
+
+For every candidate block inside the Risk Factors section, ask in order:
+
+1. **Is it rendered as a risk heading** — the bold / italic / distinct-font style the document uses for its risk titles? → **new risk.** Its `body` is all following body-styled text up to the next heading.
+2. **Is it body-styled text?** → it belongs to the **body** of the preceding heading. It is never its own risk.
+3. **Is it a category divider** (e.g. *Risks Related to Our Business*, *Risks Related to This Offering*)? → **not a risk.** Drop it, or record it in `metadata` — it never becomes a risk and never lands in a `body`.
+4. **Is it intro boilerplate** (e.g. “Investing in our common stock involves a high degree of risk…”)? → **not a risk.**
+
+The only judgment is step 1, and it is answered by **looking at the PDF**, not by reading meaning. Apply the identical typography test to every document so granularity is comparable across the set. Sanity check: your gold heading list should look like the prospectus's own risk-factor structure — if a reader skimming the PDF would count ~60 bold risk headings, gold should have ~60 risks.
+
+#### Tie-breakers
+
+- **Multi-line heading** → merge into one `title` string (one risk, not several).
+- **Heading immediately followed by another heading with no intervening body** → still **two risks**. An empty `body` is allowed **only** when the PDF genuinely shows back-to-back headings — never as an artifact of plain-text extraction splitting one risk into a title block + a separate block.
+- **Sub-bullets** → stay in the `body` of their parent risk; they are not separate risks.
+
 ### Include as a risk factor
 
 - A standalone risk with its own title/heading and following paragraphs.
@@ -58,11 +77,11 @@ Use these rules so labels stay consistent across annotators and PDF layouts.
 
 ### When two annotators might disagree
 
-Write a decision in `metadata.notes` and prefer:
+First apply the **granularity rule** above — it resolves most disagreements, because the PDF's heading typography decides the unit. Only when the styling is genuinely ambiguous, write a decision in `metadata.notes` and prefer:
 
-1. **Investor-facing granularity** — how many distinct risks would appear in a table of contents for the Risk Factors section?
-2. **Visual structure** — new bold/italic heading or clear new paragraph with a new topic → new risk.
-3. **When unsure** — merge rather than split (under-splitting is easier to catch in review than 2× over-splitting).
+1. **Visual structure** — a new bold/italic heading in the document → new risk; body-styled text → part of the preceding risk.
+2. **Investor-facing granularity** — how many distinct risks would appear in a table of contents for the Risk Factors section?
+3. **When still unsure** — merge rather than split (under-splitting is easier to catch in review than 2× over-splitting).
 
 ---
 
