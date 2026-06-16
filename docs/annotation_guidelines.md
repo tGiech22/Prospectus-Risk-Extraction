@@ -55,6 +55,17 @@ The only judgment is step 1, and it is answered by **looking at the PDF**, not b
 - **Heading immediately followed by another heading with no intervening body** → still **two risks**. An empty `body` is allowed **only** when the PDF genuinely shows back-to-back headings — never as an artifact of plain-text extraction splitting one risk into a title block + a separate block.
 - **Sub-bullets** → stay in the `body` of their parent risk; they are not separate risks.
 
+#### Worked example: when a long block is still one risk
+
+In `data/labels/1A__Aegerion_Pharmaceuticals_risks.json`, risk `id` 8 is a single ~1,400-word risk whose heading is *“In earlier preclinical studies and clinical trials, lomitapide was associated with undesirable side effects…”*. Its `body` contains several sentences that **read like** they could be their own risks:
+
+- *“A subset of patients … experienced increased levels of liver enzymes.”*
+- *“A subset of patients … also experienced increases in mean hepatic fat levels.”*
+- *“In a recently completed 104 week mouse … carcinogenicity study…”*
+- *“Even if lomitapide … receives marketing approval, we or others may later identify undesirable side effects…”*
+
+Semantically these feel separable, and an earlier draft split them into five risks. Applying the granularity rule, we checked the PDF: **only the first sentence is rendered as a bold heading; the rest are body-styled paragraphs.** By step 1/step 2, the bold sentence is the risk and the body-styled sentences belong to its `body` — so this is correctly **one** risk, not five. The lesson: topic-relatedness was a red herring; the typography decided it. (An earlier over-split here also produced empty-`body` items, which the tie-breaker on back-to-back headings forbids unless the PDF truly shows them.)
+
 ### Include as a risk factor
 
 - A standalone risk with its own title/heading and following paragraphs.
