@@ -63,6 +63,44 @@ class ProspectusAnalysis:
     extraction_method: str = ""; warnings: list = field(default_factory=list)
 
 # ============================================================================
+# FONT STYLE DETECTION
+# ============================================================================
+# PyMuPDF span "flags" bitmask: bit 1 = italic, bit 4 = bold. These are the
+# reliable signal; the font-name heuristics below are only a fallback for PDFs
+# that encode weight/slant in the name but don't set the flags.
+_FLAG_ITALIC = 1 << 1
+_FLAG_BOLD = 1 << 4
+
+# Weight/style indicators, matched as whole tokens (not raw substrings) so names
+# like "Blackadder" don't read as bold and "Inter" doesn't read as italic.
+_BOLD_TOKENS = {"bold", "bd", "heavy", "black", "demi", "demibold",
+                "semibold", "extrabold", "ultrabold"}
+_ITALIC_TOKENS = {"italic", "oblique", "slant", "it"}
+
+
+def _font_tokens(font_name):
+    """Split a font name into lowercase word tokens.
+
+    Drops the subset prefix ("ABCDEF+Arial"), breaks camelCase/PascalCase
+    ("BoldItalicMT" -> bold, italic, mt), and splits on non-alphanumeric
+    delimiters, so weight/style words can be matched exactly rather than as
+    substrings.
+    """
+    name = font_name.split("+", 1)[-1]
+    name = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name)
+    name = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", " ", name)
+    return {tok.lower() for tok in re.split(r"[^A-Za-z0-9]+", name) if tok}
+
+
+def _is_bold(flags, font_name):
+    return bool(flags & _FLAG_BOLD) or bool(_font_tokens(font_name) & _BOLD_TOKENS)
+
+
+def _is_italic(flags, font_name):
+    return bool(flags & _FLAG_ITALIC) or bool(_font_tokens(font_name) & _ITALIC_TOKENS)
+
+
+# ============================================================================
 # STEP 1: EXTRACT SPANS
 # ============================================================================
 def extract_spans(pdf_path):
@@ -77,8 +115,8 @@ def extract_spans(pdf_path):
                     t = s["text"]
                     if not t.strip(): lt.append(t); continue
                     fn, fs, fl, bb = s["font"], round(s["size"],1), s["flags"], s["bbox"]
-                    ib = bool(fl&(1<<4)) or any(x in fn.lower() for x in ["bold","-bd","heavy","black","demi","semibold"])
-                    ii = bool(fl&(1<<1)) or any(x in fn.lower() for x in ["italic","oblique","slant","-it"])
+                    ib = _is_bold(fl, fn)
+                    ii = _is_italic(fl, fn)
                     all_spans.append(Span(t,fn,fs,ib,ii,pn,round(bb[1],1),round(bb[0],1)))
                     lt.append(t)
                 plain.append("".join(lt))
