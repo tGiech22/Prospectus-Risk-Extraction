@@ -6,15 +6,14 @@ from collections import Counter
 
 import pdfplumber
 
+from .words import count_words
+
 # Section boundary detection.
 START_RE = re.compile(r"^\s*RISK\s+FACTORS\s*$", re.I)
 END_RE = re.compile(
     r"^\s*(USE\s+OF\s+PROCEEDS|MANAGEMENT|BUSINESS|DESCRIPTION\s+OF\s+SECURITIES|FORWARD-LOOKING\s+STATEMENTS?|NOTE\s+REGARDING\s+FORWARD-LOOKING\s+STATEMENTS)\s*$",
     re.I,
 )
-
-# Basic word tokenizer for risk body word counts.
-WORD_RE = re.compile(r"\b[0-9A-Za-z']+\b")
 
 
 def is_page_number(text):
@@ -352,11 +351,6 @@ def split_risks(section_lines):
     if current:
         risks.append(current)
     return risks
-
-
-def count_words(text):
-    """Count word-like tokens in a string."""
-    return len(WORD_RE.findall(text))
 
 
 def analyze(pdf_path):

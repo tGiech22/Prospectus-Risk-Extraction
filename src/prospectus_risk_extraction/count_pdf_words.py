@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import argparse
-import re
 from pathlib import Path
 
 import pdfplumber
 from openpyxl import Workbook
 
-# Include ASCII apostrophe and common Unicode apostrophes.
-WORD_RE = re.compile(r"\b[0-9A-Za-z'’‛`]+\b")
+from .words import count_words
 
 
 def count_words_in_pdf(pdf_path):
@@ -15,7 +13,7 @@ def count_words_in_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             text = page.extract_text() or ""
-            total += len(WORD_RE.findall(text))
+            total += count_words(text)
     return total
 
 

@@ -16,6 +16,8 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional
 from collections import Counter
 
+from .words import count_words
+
 try:
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -488,7 +490,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
             if tp == 'heading':
                 if cur_title:
                     body = "\n".join(p for p in body_parts if p)
-                    wc = len(body.split())
+                    wc = count_words(body)
                     if wc >= 3: rfs.append(RiskFactor(cur_title, body, wc))
                 cur_title = txt; body_parts = []
             elif tp in ('subheading', 'skip'): continue
@@ -496,7 +498,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
                 if txt: body_parts.append(txt)
         if cur_title:
             body = "\n".join(p for p in body_parts if p)
-            wc = len(body.split())
+            wc = count_words(body)
             if wc >= 3: rfs.append(RiskFactor(cur_title, body, wc))
 
         if DEBUG:
@@ -570,7 +572,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
             if is_title_indent and p.is_short and wc >= 3:
                 if cur_title is not None:
                     body = " ".join(body_parts)
-                    bwc = len(body.split())
+                    bwc = count_words(body)
                     if bwc >= 3: rfs.append(RiskFactor(cur_title, body, bwc))
                 cur_title = t; body_parts = []
             else:
@@ -578,7 +580,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
 
         if cur_title:
             body = " ".join(body_parts)
-            bwc = len(body.split())
+            bwc = count_words(body)
             if bwc >= 3: rfs.append(RiskFactor(cur_title, body, bwc))
 
         if len(rfs) >= 3:
@@ -652,7 +654,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
         if cls == 'heading':
             if cur_title:
                 body = " ".join(body_parts)
-                wc = len(body.split())
+                wc = count_words(body)
                 if wc >= 3: rfs.append(RiskFactor(cur_title, body, wc))
             cur_title = para.text.strip(); body_parts = []
         elif cls in ('subheading', 'skip', 'intro'): continue
@@ -660,7 +662,7 @@ def segment_risk_factors(lines, start_idx, end_idx, style):
             if para.text.strip(): body_parts.append(para.text.strip())
     if cur_title:
         body = " ".join(body_parts)
-        wc = len(body.split())
+        wc = count_words(body)
         if wc >= 3: rfs.append(RiskFactor(cur_title, body, wc))
 
     return rfs, method
@@ -689,7 +691,7 @@ def analyze_prospectus(pdf_path):
     print("-" * 60)
     print("  Extracting text...")
     pt, spans = extract_spans(pdf_path)
-    tw = len(pt.split())
+    tw = count_words(pt)
     print(f"  Total word count: {tw:,}")
     if tw == 0:
         return ProspectusAnalysis(fn, 0, 0, 0, extraction_method="FAILED-NO-TEXT",
@@ -707,7 +709,7 @@ def analyze_prospectus(pdf_path):
                                   warnings=["Could not locate Risk Factors section"])
     si, ei = sr
     st = " ".join(ln.text for ln in lines[si:ei])
-    rw = len(st.split())
+    rw = count_words(st)
     print(f"  Risk Factors: ~{rw:,} words (lines {si}-{ei})")
     print("  Segmenting risk factors...")
     rfs, method = segment_risk_factors(lines, si, ei, style)
