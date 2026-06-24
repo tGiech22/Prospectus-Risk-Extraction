@@ -18,4 +18,4 @@ artifacts/models/
 # Local outputs from ad-hoc runs
 *.csv
 *.xlsx
-*.json
+/*.json
