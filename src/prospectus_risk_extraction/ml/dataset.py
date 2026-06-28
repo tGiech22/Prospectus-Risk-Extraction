@@ -14,7 +14,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from .labeling import line_features, load_section_lines, weak_label
+from .labeling import (
+    DEFAULT_LABELS_DIR,
+    gold_line_labels,
+    line_features,
+    load_gold,
+    load_section_lines,
+    weak_label,
+)
 
 
 def build_dataframe(pdf_paths: list[str]) -> pd.DataFrame:
@@ -32,6 +39,51 @@ def build_dataframe(pdf_paths: list[str]) -> pd.DataFrame:
             rows.append(feats)
         print(f"  {doc.doc_id}: {len(doc.lines)} section lines")
     return pd.DataFrame(rows)
+
+
+def build_gold_dataframe(
+    pdf_paths: list[str], labels_dir: str = DEFAULT_LABELS_DIR
+) -> pd.DataFrame:
+    """Like :func:`build_dataframe` but labels come from hand-annotated gold.
+
+    PDFs without a matching gold file under ``labels_dir`` are skipped (their
+    truth is unknown). For each labeled doc we also print the heading-run count
+    vs the gold risk count - the alignment sanity check: they should match.
+    """
+    rows = []
+    for path in pdf_paths:
+        doc = load_section_lines(path)
+        if not doc.lines:
+            print(f"  skip {doc.doc_id}: no Risk Factors section / no text")
+            continue
+        gold = load_gold(doc.doc_id, labels_dir)
+        if gold is None:
+            print(f"  skip {doc.doc_id}: no gold file in {labels_dir}")
+            continue
+        labels = gold_line_labels(doc.lines, gold, doc.style)
+        for line, label in zip(doc.lines, labels):
+            feats = line_features(line, doc.style)
+            feats["label"] = label
+            feats["doc_id"] = doc.doc_id
+            rows.append(feats)
+        runs = _count_heading_runs(labels)
+        gold_n = len(gold.get("risk_factors", []))
+        flag = "" if runs == gold_n else "  <-- MISMATCH (tune matcher)"
+        print(
+            f"  {doc.doc_id}: {len(doc.lines)} lines | "
+            f"heading-runs={runs} gold-risks={gold_n}{flag}"
+        )
+    return pd.DataFrame(rows)
+
+
+def _count_heading_runs(labels: list[str]) -> int:
+    """Number of maximal consecutive ``heading`` runs (== number of risks)."""
+    runs, prev = 0, False
+    for lab in labels:
+        if lab == "heading" and not prev:
+            runs += 1
+        prev = lab == "heading"
+    return runs
 
 
 def find_pdfs(root: str) -> list[str]:
