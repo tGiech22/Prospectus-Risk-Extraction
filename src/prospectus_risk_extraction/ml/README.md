@@ -28,11 +28,25 @@ before doing any hand-labeling. When you hand-label real gold lines, replace `we
 ## Data reality
 
 The `test_fixtures/*.pdf` are one-sentence smoke tests for the word counter (e.g.
-`"Hello world."`) — **not** risk-factor data. The only real document is the Aegerion
-prospectus in `data/sample_pdfs/`. With one document you cannot estimate generalization,
-so `train.py` prints a loud warning and uses a (optimistic) line-level split. Drop more
-real prospectus PDFs into the folder and evaluation **automatically upgrades** to
-document-grouped cross-validation — no code change.
+`"Hello world."`) — **not** risk-factor data. The real prospectuses live in
+`data/sample_pdfs/` (15 at last count), with hand-annotated gold in `data/labels/`.
+With ≥ 3 documents `train.py` automatically uses document-grouped cross-validation
+(no line from a training doc leaks into its own test fold); with < 3 it falls back
+to an optimistic line-level split and prints a loud warning.
+
+## Weak vs gold labels
+
+```bash
+prospectus-ml-train data/sample_pdfs                 # --labels weak (default)
+prospectus-ml-train data/sample_pdfs --labels gold   # hand annotations in data/labels/
+```
+
+`--labels gold` builds the dataset from `data/labels/*.json` instead of `weak_label`.
+Gold titles are clean prose that may wrap across several physical lines, so
+`gold_line_labels()` (in `labeling.py`) aligns each title to a run of consecutive
+lines and marks them `heading`. The builder prints a **per-doc alignment check** —
+`heading-runs` should equal `gold-risks`; a `MISMATCH` flag means the matcher needs
+tuning for that document. PDFs without a gold file are skipped.
 
 ## Usage
 
