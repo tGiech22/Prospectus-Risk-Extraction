@@ -31,8 +31,8 @@ from sklearn.model_selection import GroupKFold, cross_val_predict, train_test_sp
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from .dataset import build_dataframe, find_pdfs
-from .labeling import LABELS, NUMERIC_FEATURES, TEXT_FEATURE
+from .dataset import build_dataframe, build_gold_dataframe, find_pdfs
+from .labeling import DEFAULT_LABELS_DIR, LABELS, NUMERIC_FEATURES, TEXT_FEATURE
 
 
 def build_model() -> Pipeline:
@@ -98,7 +98,7 @@ def report(df: pd.DataFrame, preds: np.ndarray) -> None:
     if mask is not None:
         y, preds = y[mask], preds[mask]
     present = [l for l in LABELS if l in set(y) | set(preds)]
-    print("\n=== Classification report (heuristic-distilled labels) ===")
+    print("\n=== Classification report ===")
     print(classification_report(y, preds, labels=present, zero_division=0))
     print("Confusion matrix (rows = true, cols = predicted):")
     cm = confusion_matrix(y, preds, labels=present)
@@ -127,12 +127,12 @@ def segmentation_check(df: pd.DataFrame, preds: np.ndarray) -> None:
                 prev_heading = False
         return risks
 
-    print("\n=== Risk count: heuristic labels vs model predictions (per doc) ===")
+    print("\n=== Risk count: true labels vs model predictions (per doc) ===")
     df = df.assign(pred=preds)
     for doc_id, g in df.groupby("doc_id"):
-        gold = count_risks(g["label"].tolist())
+        true = count_risks(g["label"].tolist())
         pred = count_risks(g["pred"].tolist())
-        print(f"  {doc_id:<45} heuristic={gold:>4}  model={pred:>4}  diff={pred - gold:+d}")
+        print(f"  {doc_id:<45} true={true:>4}  model={pred:>4}  diff={pred - true:+d}")
 
 
 def main() -> None:
@@ -141,14 +141,24 @@ def main() -> None:
     parser.add_argument(
         "-m", "--model-out", default="artifacts/models/line_classifier.joblib"
     )
+    parser.add_argument(
+        "--labels",
+        choices=["weak", "gold"],
+        default="weak",
+        help="weak = heuristic-distilled (default); gold = hand annotations in --labels-dir",
+    )
+    parser.add_argument("--labels-dir", default=DEFAULT_LABELS_DIR)
     args = parser.parse_args()
 
     pdfs = find_pdfs(args.pdf_path)
     if not pdfs:
         print(f"No PDFs found under {args.pdf_path!r}")
         return
-    print(f"Building dataset from {len(pdfs)} PDF(s)...")
-    df = build_dataframe(pdfs)
+    print(f"Building dataset from {len(pdfs)} PDF(s) [labels={args.labels}]...")
+    if args.labels == "gold":
+        df = build_gold_dataframe(pdfs, args.labels_dir)
+    else:
+        df = build_dataframe(pdfs)
     if df.empty or df["label"].nunique() < 2:
         print("Not enough labeled data to train (need >= 2 classes).")
         return
