@@ -32,7 +32,15 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from .dataset import build_dataframe, build_gold_dataframe, find_pdfs
-from .labeling import DEFAULT_LABELS_DIR, LABELS, NUMERIC_FEATURES, TEXT_FEATURE
+from .labeling import (
+    DEFAULT_LABELS_DIR,
+    LABELS,
+    NUMERIC_FEATURES,
+    TEXT_FEATURE,
+    _canon,
+)
+
+DEFAULT_SPLITS_DIR = "data/labels/splits"
 
 
 def build_model() -> Pipeline:
@@ -108,6 +116,19 @@ def report(df: pd.DataFrame, preds: np.ndarray) -> None:
         print(f"{label[:6]:>6}  " + "".join(f"{v:>8}" for v in row))
 
 
+def count_risks(labels: list[str]) -> int:
+    """Number of risks = runs of consecutive ``heading`` lines."""
+    risks, prev_heading = 0, False
+    for lab in labels:
+        if lab == "heading":
+            if not prev_heading:
+                risks += 1
+            prev_heading = True
+        else:
+            prev_heading = False
+    return risks
+
+
 def segmentation_check(df: pd.DataFrame, preds: np.ndarray) -> None:
     """Compare risk counts from predicted vs heuristic headings, per document.
 
@@ -115,24 +136,57 @@ def segmentation_check(df: pd.DataFrame, preds: np.ndarray) -> None:
     the payoff: it shows how line-level accuracy turns into the document-level
     number the product cares about.
     """
-
-    def count_risks(labels: list[str]) -> int:
-        risks, prev_heading = 0, False
-        for lab in labels:
-            if lab == "heading":
-                if not prev_heading:
-                    risks += 1
-                prev_heading = True
-            else:
-                prev_heading = False
-        return risks
-
     print("\n=== Risk count: true labels vs model predictions (per doc) ===")
     df = df.assign(pred=preds)
     for doc_id, g in df.groupby("doc_id"):
         true = count_risks(g["label"].tolist())
         pred = count_risks(g["pred"].tolist())
         print(f"  {doc_id:<45} true={true:>4}  model={pred:>4}  diff={pred - true:+d}")
+
+
+def _read_split(path: Path) -> set[str] | None:
+    """Read a split file into a set of canonical doc keys, or None if missing."""
+    if not path.exists():
+        return None
+    return {_canon(l.strip()) for l in path.read_text().splitlines() if l.strip()}
+
+
+def fixed_split_eval(df: pd.DataFrame, splits_dir: str) -> None:
+    """Train on ``train.txt`` docs, report once on the held-out ``test.txt`` docs.
+
+    Complements the grouped CV with a single frozen test number (the kind you put
+    in a baseline table). Skips gracefully if the split files are absent or do not
+    line up with the documents actually loaded. ``val.txt`` is intentionally left
+    out of both fit and report - reserve it for tuning.
+    """
+    sdir = Path(splits_dir)
+    train_ids = _read_split(sdir / "train.txt")
+    test_ids = _read_split(sdir / "test.txt")
+    if not train_ids or not test_ids:
+        print(f"\n(No fixed-split eval: need train.txt and test.txt in {splits_dir})")
+        return
+
+    canon = df["doc_id"].map(_canon)
+    tr, te = canon.isin(train_ids), canon.isin(test_ids)
+    if tr.sum() == 0 or te.sum() == 0:
+        print(f"\n(No fixed-split eval: split ids don't match loaded docs in {splits_dir})")
+        return
+
+    cols = NUMERIC_FEATURES + [TEXT_FEATURE]
+    model = build_model()
+    model.fit(df.loc[tr, cols], df.loc[tr, "label"])
+    y = df.loc[te, "label"].to_numpy()
+    preds = model.predict(df.loc[te, cols])
+
+    n_train, n_test = df.loc[tr, "doc_id"].nunique(), df.loc[te, "doc_id"].nunique()
+    print(f"\n=== Fixed held-out split: fit on {n_train} train docs -> report on {n_test} test docs ===")
+    present = [l for l in LABELS if l in set(y) | set(preds)]
+    print(classification_report(y, preds, labels=present, zero_division=0))
+    print("Risk count on test docs (true vs model):")
+    test_df = df.loc[te].assign(pred=preds)
+    for doc_id, g in test_df.groupby("doc_id"):
+        t, p = count_risks(g["label"].tolist()), count_risks(g["pred"].tolist())
+        print(f"  {doc_id:<45} true={t:>4}  model={p:>4}  diff={p - t:+d}")
 
 
 def main() -> None:
@@ -148,6 +202,11 @@ def main() -> None:
         help="weak = heuristic-distilled (default); gold = hand annotations in --labels-dir",
     )
     parser.add_argument("--labels-dir", default=DEFAULT_LABELS_DIR)
+    parser.add_argument(
+        "--splits-dir",
+        default=DEFAULT_SPLITS_DIR,
+        help="dir with train.txt/test.txt for a fixed held-out report (in addition to CV)",
+    )
     args = parser.parse_args()
 
     pdfs = find_pdfs(args.pdf_path)
@@ -169,6 +228,7 @@ def main() -> None:
     preds = evaluate(df, model)
     report(df, preds)
     segmentation_check(df, preds)
+    fixed_split_eval(df, args.splits_dir)
 
     # Fit a final model on ALL data for downstream use / inference.
     model.fit(df[NUMERIC_FEATURES + [TEXT_FEATURE]], df["label"])
