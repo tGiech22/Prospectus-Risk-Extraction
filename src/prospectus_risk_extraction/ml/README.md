@@ -74,7 +74,20 @@ prospectus-ml-dataset data/sample_pdfs -o artifacts/ml/line_dataset.csv
 
 # 2. Train + evaluate + save the model
 prospectus-ml-train data/sample_pdfs
+
+# 3. Run the saved model on new PDFs (reconstructs title/body/word_count per risk)
+prospectus-ml-predict "data/sample_pdfs/1A. Aegerion Pharmaceuticals.pdf"
+
+# 4. Close the loop: score the model's segmentation against gold
+prospectus-ml-predict data/sample_pdfs --eval
 ```
+
+`prospectus-ml-predict` loads `artifacts/models/line_classifier.joblib`, classifies
+each Risk Factors line, then segments predicted `heading` runs back into
+`(title, body, word_count)` risks — the same shape `analyzer` emits, so the two are
+directly comparable. `--eval` reports the Task-B metrics from
+`docs/evaluation_and_baseline_reporting.md` (exact-count accuracy, count MAE/bias,
+fuzzy title recall@1) for every PDF that has a gold file.
 
 ## Files
 
@@ -83,6 +96,7 @@ prospectus-ml-train data/sample_pdfs
 | [labeling.py](labeling.py) | per-line features + weak label (reuses analyzer parsing) |
 | [dataset.py](dataset.py) | build a `pandas` DataFrame / CSV across PDFs |
 | [train.py](train.py) | sklearn pipeline (layout features + TF-IDF → logistic regression), grouped CV, report, risk-count check |
+| [predict.py](predict.py) | load the saved model, classify a new PDF, reconstruct risks, score segmentation vs gold |
 
 ## Next steps (the learning path)
 
@@ -90,5 +104,7 @@ prospectus-ml-train data/sample_pdfs
 2. **More PDFs** → grouped CV gives a real generalization number to beat the heuristic.
 3. **Better model** → try gradient boosting on numeric features, then a transformer
    (DistilBERT on line text, or LayoutLM to fuse text + geometry) using the same dataset.
-4. **Close the loop** → feed predicted `heading` lines back into segmentation and score
-   with the metrics in `docs/evaluation_and_baseline_reporting.md`.
+4. ~~**Close the loop** → feed predicted `heading` lines back into segmentation and score
+   with the metrics in `docs/evaluation_and_baseline_reporting.md`.~~ **Done** —
+   see `prospectus-ml-predict --eval` ([predict.py](predict.py)). Compare its numbers
+   against the heuristic baseline on the same `data/labels/splits/test.txt` docs.
