@@ -48,6 +48,22 @@ lines and marks them `heading`. The builder prints a **per-doc alignment check**
 `heading-runs` should equal `gold-risks`; a `MISMATCH` flag means the matcher needs
 tuning for that document. PDFs without a gold file are skipped.
 
+The gold section window is anchored on the gold titles (`gold_section_window()`),
+not the heuristic `find_risk_section` — the heuristic can start a few dozen lines
+late and clip the first risk(s), so we scan a short lookback before its boundary
+to recover them.
+
+## Evaluation: grouped CV + a fixed held-out split
+
+`train.py` always reports document-grouped cross-validation (every doc gets a turn
+as test). If `--splits-dir` (default `data/labels/splits/`) has `train.txt` and
+`test.txt`, it *also* fits on the train docs and reports once on the held-out test
+docs — the frozen number for a baseline table. `val.txt` is left out of both.
+
+> At n=15 the 3-doc test is noisy: which docs land in it dominates the number.
+> Treat the **grouped-CV** figure as the headline and the fixed test as a
+> secondary stress check until there are ~20–25 labeled docs.
+
 ## Usage
 
 ```bash
