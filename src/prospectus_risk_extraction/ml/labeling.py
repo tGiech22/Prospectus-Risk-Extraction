@@ -184,6 +184,76 @@ def load_gold(doc_id: str, labels_dir: str = DEFAULT_LABELS_DIR) -> dict | None:
     return json.loads(Path(path).read_text())
 
 
+def _reconstruct_len(norm_lines: list[str], i: int, title: str) -> int:
+    """How many consecutive lines starting at ``i`` reconstruct ``title``.
+
+    Returns the run length ``k`` (>= 1) if lines ``i..i+k`` rebuild the title
+    text (titles wrap across several physical lines), else 0. Accepts a full
+    reconstruction or a confident partial, tolerating minor tokenization drift
+    between the PDF text and the clean gold title.
+    """
+    if not norm_lines[i] or not title.startswith(norm_lines[i][:8]):
+        return 0
+    acc, k = "", 0
+    while i + k < len(norm_lines) and len(acc) < len(title) + 5:
+        cand = (acc + " " + norm_lines[i + k]).strip()
+        head = title[: len(cand)]
+        if title.startswith(cand) or SequenceMatcher(None, cand, head).ratio() >= 0.9:
+            acc, k = cand, k + 1
+            if len(acc) >= len(title) * 0.95:
+                break
+        else:
+            break
+    covered = len(acc) >= min(40, len(title) * 0.6)
+    return k if (k > 0 and covered) else 0
+
+
+def _gold_titles(gold: dict) -> list[str]:
+    titles = [_norm_text(rf.get("title", "")) for rf in gold.get("risk_factors", [])]
+    return [t for t in titles if t]
+
+
+# Lines the heuristic section may start late by (e.g. it can miss the first risk
+# heading). We let gold titles anchor the true start by scanning a little before
+# the heuristic boundary - but not so far that an earlier table-of-contents
+# listing of the same headings gets matched instead.
+_SECTION_LOOKBACK = 80
+
+
+def gold_section_window(lines: list, gold: dict, heuristic_section) -> tuple | None:
+    """Section [start, end) anchored on gold titles, not the fallible heuristic.
+
+    The heuristic ``find_risk_section`` can start a few dozen lines too late and
+    clip the first risk(s). We match gold titles in document order within a
+    window around the heuristic boundary and take the span from the first matched
+    title to the last (extended to the heuristic end so the final risk's body is
+    included). Falls back to the heuristic section if nothing matches.
+    """
+    titles = _gold_titles(gold)
+    if not titles:
+        return heuristic_section
+    norm = [_norm_text(ln.text) for ln in lines]
+    if heuristic_section:
+        si, ei = heuristic_section
+        cursor = max(0, si - _SECTION_LOOKBACK)
+    else:
+        ei, cursor = None, 0
+    first_start = last_end = None
+    for title in titles:
+        for i in range(cursor, len(norm)):
+            k = _reconstruct_len(norm, i, title)
+            if k:
+                if first_start is None:
+                    first_start = i
+                last_end = i + k
+                cursor = i + k
+                break
+    if first_start is None:
+        return heuristic_section
+    end = max(ei, last_end) if ei is not None else last_end
+    return (first_start, end)
+
+
 def gold_line_labels(lines: list, gold: dict, style) -> list[str]:
     """Align analyzer-parsed section lines to gold risk titles -> per-line labels.
 
@@ -194,8 +264,7 @@ def gold_line_labels(lines: list, gold: dict, style) -> list[str]:
     exactly one risk); the rest are ``skip`` (noise), ``subheading`` (category),
     or ``body``.
     """
-    titles = [_norm_text(rf.get("title", "")) for rf in gold.get("risk_factors", [])]
-    titles = [t for t in titles if t]
+    titles = _gold_titles(gold)
     used = [False] * len(titles)
     norm_lines = [_norm_text(ln.text) for ln in lines]
 
@@ -203,21 +272,10 @@ def gold_line_labels(lines: list, gold: dict, style) -> list[str]:
         """Best (title_idx, n_lines) for a title starting at line ``i``, else (-1, 0)."""
         best = (-1, 0)
         for ti, title in enumerate(titles):
-            if used[ti] or not norm_lines[i] or not title.startswith(norm_lines[i][:8]):
+            if used[ti]:
                 continue
-            acc, k = "", 0
-            while i + k < len(norm_lines) and len(acc) < len(title) + 5:
-                cand = (acc + " " + norm_lines[i + k]).strip()
-                head = title[: len(cand)]
-                if title.startswith(cand) or SequenceMatcher(None, cand, head).ratio() >= 0.9:
-                    acc, k = cand, k + 1
-                    if len(acc) >= len(title) * 0.95:
-                        break
-                else:
-                    break
-            # Accept a full reconstruction, or a confident partial (wrapped title).
-            covered = len(acc) >= min(40, len(title) * 0.6)
-            if k > 0 and covered and k > best[1]:
+            k = _reconstruct_len(norm_lines, i, title)
+            if k > best[1]:
                 best = (ti, k)
         return best
 
@@ -241,3 +299,27 @@ def gold_line_labels(lines: list, gold: dict, style) -> list[str]:
             out[i] = "subheading"
         i += 1
     return out
+
+
+def load_gold_section_lines(
+    pdf_path: str, gold: dict, doc_id: str | None = None
+) -> DocLines:
+    """Parse a PDF and return the Risk Factors lines using a gold-anchored window.
+
+    Unlike :func:`load_section_lines` (which trusts the heuristic boundary), this
+    extends the section so it contains every gold risk title - the right basis
+    for building a gold training set.
+    """
+    import os
+
+    doc_id = doc_id or os.path.basename(pdf_path)
+    _, spans = extract_spans(pdf_path)
+    lines = build_lines(spans)
+    if not lines:
+        return DocLines(doc_id, [], None, None)
+    style = learn_style(lines)
+    window = gold_section_window(lines, gold, find_risk_section(lines))
+    if window is None:
+        return DocLines(doc_id, [], style, None)
+    si, ei = window
+    return DocLines(doc_id, lines[si:ei], style, window)
