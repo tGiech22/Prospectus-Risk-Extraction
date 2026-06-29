@@ -24,6 +24,7 @@ prospectus-extract-risks = "prospectus_risk_extraction.extract_risks:main"
 prospectus-count-words = "prospectus_risk_extraction.count_pdf_words:main"
 prospectus-ml-dataset = "prospectus_risk_extraction.ml.dataset:main"
 prospectus-ml-train = "prospectus_risk_extraction.ml.train:main"
+prospectus-ml-predict = "prospectus_risk_extraction.ml.predict:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
