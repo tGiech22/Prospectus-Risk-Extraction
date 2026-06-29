@@ -19,6 +19,7 @@ from .labeling import (
     gold_line_labels,
     line_features,
     load_gold,
+    load_gold_section_lines,
     load_section_lines,
     weak_label,
 )
@@ -52,13 +53,14 @@ def build_gold_dataframe(
     """
     rows = []
     for path in pdf_paths:
-        doc = load_section_lines(path)
+        doc_id = Path(path).name
+        gold = load_gold(doc_id, labels_dir)
+        if gold is None:
+            print(f"  skip {doc_id}: no gold file in {labels_dir}")
+            continue
+        doc = load_gold_section_lines(path, gold, doc_id)
         if not doc.lines:
             print(f"  skip {doc.doc_id}: no Risk Factors section / no text")
-            continue
-        gold = load_gold(doc.doc_id, labels_dir)
-        if gold is None:
-            print(f"  skip {doc.doc_id}: no gold file in {labels_dir}")
             continue
         labels = gold_line_labels(doc.lines, gold, doc.style)
         for line, label in zip(doc.lines, labels):
