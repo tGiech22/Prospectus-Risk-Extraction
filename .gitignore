@@ -19,3 +19,7 @@ artifacts/models/
 *.csv
 *.xlsx
 /*.json
+
+# Auto-generated agent-skill symlinks into .venv (created by streamlit install)
+.agents/skills/
+.claude/skills/
